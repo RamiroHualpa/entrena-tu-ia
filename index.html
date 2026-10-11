@@ -65,7 +65,22 @@
   .row button, .ghost { flex: 1; background: var(--panel2); color: var(--text); font-size: 16px; }
   .score { display: flex; justify-content: space-around; font-size: clamp(16px, 4.5vw, 22px); margin-top: 12px; text-align: center; }
   .score b { font-size: clamp(28px, 8vw, 36px); display: block; }
-  pre { background: #070b16; border-radius: 12px; padding: 14px; font-size: 14px; overflow-x: auto; color: #cfe3ff; margin: 0; }
+  /* Código de ejemplo: cada línea es un bloque que corta palabras sin salirse y mantiene su sangría al cortar */
+  .code { background: #070b16; border-radius: 12px; padding: 12px 12px 12px 8px; margin: 0; color: #d6deeb;
+          font: 14px/1.55 ui-monospace, "Cascadia Code", Consolas, Menlo, monospace; overflow-wrap: anywhere;
+          font-variant-ligatures: none; font-feature-settings: "liga" 0, "calt" 0; }   /* que "=>" se vea tal cual se escribe */
+  .code .ln { padding-left: calc(var(--i, 0) * 1ch + 2.5ch); text-indent: -2ch; min-height: 1.55em; }
+  .code .ln.note { background: #ffb70314; border-left: 3px solid var(--accent); border-radius: 4px; margin: 6px 0 2px; padding-top: 2px; padding-bottom: 2px; }
+  .code .ln.note + .ln.note { margin-top: -2px; }
+  .tk-com { color: #ffd166; font-style: italic; }
+  .tk-kw  { color: #c792ea; }
+  .tk-str { color: #a5e075; }
+  .tk-num { color: #f78c6c; }
+  .tk-fn  { color: #82aaff; }
+  .tk-prop{ color: #7fdbca; }
+  .tk-op  { color: #89ddff; }
+  .legend { margin: 0 0 10px; font-size: 14px; color: var(--muted); }
+  .legend .tk-com { font-family: ui-monospace, Consolas, Menlo, monospace; }
   .hint { color: var(--muted); font-size: 15px; margin: 8px 0 0; }
   .hidden { display: none !important; }
 
@@ -93,7 +108,7 @@
 
   /* Tablet y teléfono vertical: una columna, la cámara queda fija arriba al hacer scroll */
   @media (max-width: 900px) {
-    main { grid-template-columns: 1fr; }
+    main { grid-template-columns: minmax(0, 1fr); }   /* minmax(0,…) evita que un contenido ancho estire la columna */
     main > section:first-child { position: sticky; top: 0; z-index: 5; background: var(--bg);
                                  margin: 0 calc(-1 * var(--gutter)); padding: 8px var(--gutter) 4px; }
     .stage { width: min(100%, calc(42svh * 4 / 3)); }
@@ -107,7 +122,7 @@
     .count { font-size: 16px; min-width: 48px; }
     .row button, .ghost { font-size: 15px; padding: 12px 10px; }
     .hint { font-size: 14px; }
-    pre { font-size: 12px; padding: 10px; }
+    .code { font-size: 13px; }
     .modal-card { padding: 20px 16px 16px; }
     .modal-card .big { font-size: 52px; }
   }
@@ -179,20 +194,8 @@
 
     <div class="card hidden" id="codeCard">
       <h2>Así "aprende" la IA</h2>
-<pre>// 1. La cámara detecta 21 puntos de tu mano
-const puntos = detector.detectar(video);
-
-// 2. Guardamos ejemplos de cada gesto
-ejemplos.push({ puntos, gesto: "piedra" });
-
-// 3. Para adivinar, busca los ejemplos más parecidos
-function adivinar(puntosNuevos) {
-  const cercanos = ejemplos
-    .map(e => ({ gesto: e.gesto, dist: distancia(e.puntos, puntosNuevos) }))
-    .sort((a, b) => a.dist - b.dist)
-    .slice(0, 7);
-  return elMasVotado(cercanos);   // ¡eso es todo!
-}</pre>
+      <p class="legend"><span class="tk-com">// en amarillo</span> están los comentarios: explican qué hace cada parte.</p>
+      <div class="code" id="code" role="region" aria-label="Código de ejemplo en JavaScript"></div>
       <p class="hint">Esto se llama "k vecinos más cercanos" (KNN). Lo aprendés a programar en la carrera.</p>
     </div>
   </section>
@@ -525,6 +528,62 @@ $("play").onclick = play;
 $("reset").onclick = reset;
 $("resetTrain").onclick = resetTraining;
 $("toggleCode").onclick = () => $("codeCard").classList.toggle("hidden");
+
+// ---------- Código de ejemplo con colores ----------
+const CODE = `// 1. La cámara detecta 21 puntos de tu mano
+const puntos = detector.detectar(video);
+
+// 2. Guardamos el ejemplo junto con el gesto que le enseñaste
+ejemplos.push({ puntos, gesto: "piedra" });
+
+// 3. Para adivinar un gesto nuevo...
+function adivinar(puntosNuevos) {
+  const cercanos = ejemplos
+    // ...medimos qué tan lejos está de cada ejemplo guardado
+    .map(e => ({
+      gesto: e.gesto,
+      dist: distancia(e.puntos, puntosNuevos),
+    }))
+    // ...ordenamos del más parecido al menos parecido
+    .sort((a, b) => a.dist - b.dist)
+    // ...y nos quedamos con los 7 más cercanos
+    .slice(0, 7);
+
+  // Gana el gesto que más se repite entre esos 7
+  return elMasVotado(cercanos);   // ¡eso es todo!
+}`;
+
+const KEYWORDS = new Set(["const", "let", "var", "function", "return", "new", "if", "else", "for", "of", "in",
+                          "await", "async", "true", "false", "null", "undefined"]);
+const esc = s => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+const tok = (cls, t) => `<span class="tk-${cls}">${esc(t)}</span>`;
+
+function highlightLine(line) {
+  const re = /(\/\/.*$)|("(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*')|(\b\d+(?:\.\d+)?\b)|([A-Za-z_$][\w$]*)|(=>|[=+\-*\/<>!&|]+)|([\s\S])/g;
+  let out = "", m;
+  while ((m = re.exec(line))) {
+    const [t, com, str, num, id, op] = m;
+    if (com) out += tok("com", t);
+    else if (str) out += tok("str", t);
+    else if (num) out += tok("num", t);
+    else if (id) {
+      const next = line.slice(re.lastIndex).trimStart()[0];
+      if (KEYWORDS.has(t)) out += tok("kw", t);
+      else if (next === "(") out += tok("fn", t);                          // llamada o declaración de función
+      else if (line[m.index - 1] === "." || next === ":") out += tok("prop", t);   // propiedad
+      else out += esc(t);
+    }
+    else if (op) out += tok("op", t);
+    else out += esc(t);
+  }
+  return out;
+}
+
+$("code").innerHTML = CODE.split("\n").map(line => {
+  const indent = line.length - line.trimStart().length;
+  const note = line.trimStart().startsWith("//") ? " note" : "";        // línea que es solo comentario: se destaca
+  return `<div class="ln${note}" style="--i:${indent}">${highlightLine(line.trimStart())}</div>`;
+}).join("");
 
 // ---------- Modales ----------
 const openModals = () => document.querySelectorAll(".modal:not(.hidden)");
