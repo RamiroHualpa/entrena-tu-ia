@@ -15,3 +15,5 @@ y los gestos se clasifican con k vecinos más cercanos (KNN), todo en el navegad
 En computadora también funcionan las teclas `1`, `2`, `3` (grabar), `espacio` (jugar), `R` (nuevo jugador) y `C` (ver el código).
 
 La cámara necesita https, por eso hay que abrirla desde GitHub Pages (o `localhost`) y no como archivo local.
+
+![QR para abrirla en el teléfono](qr-entrena-tu-ia.png)
